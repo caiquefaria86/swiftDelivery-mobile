@@ -68,7 +68,6 @@ class PusherService {
 
     try {
       // MUDANÇA: Para canal público, você precisa enviar via servidor
-      // Client events só funcionam em canais privados/presence com autenticação
       
       // Opção 1: Enviar via seu backend
       console.warn('Para canal público, envie via seu servidor backend');

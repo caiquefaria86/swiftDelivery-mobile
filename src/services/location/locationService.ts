@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
-import { pusherService } from '../pusher/pusherService';
+import { apiService } from '../api/apiService';
 
 export interface LocationData {
   latitude: number;
@@ -68,10 +68,7 @@ class LocationService {
         }
       );
 
-      // Aguarda um pouco para garantir que o Pusher esteja conectado
-      await this.waitForPusherConnection();
-      
-      // Inicia o envio periódico via Pusher
+      // Inicia o envio periódico via API
       this.startPeriodicLocationSend();
 
       console.log('Location tracking iniciado');
@@ -81,22 +78,7 @@ class LocationService {
     }
   }
 
-  // Aguarda conexão do Pusher
-  private async waitForPusherConnection(maxRetries: number = 10): Promise<void> {
-    let retries = 0;
-    
-    while (retries < maxRetries && !pusherService.isConnected) {
-      console.log(`Aguardando conexão Pusher... tentativa ${retries + 1}`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      retries++;
-    }
-
-    if (!pusherService.isConnected) {
-      throw new Error('Pusher não conseguiu conectar após várias tentativas');
-    }
-
-    console.log('✅ Pusher conectado e pronto');
-  }
+  // Método waitForPusherConnection removido pois não é mais necessário
 
   // Para o tracking de localização
   stopLocationTracking(): void {
@@ -122,18 +104,13 @@ class LocationService {
     console.log('Location tracking parado');
   }
 
-  // Envia localização via Pusher a cada 10 segundos
+  // Envia localização via API a cada 10 segundos
   private startPeriodicLocationSend(): void {
     this.intervalId = setInterval(async () => {
       if (this.currentLocation && this.deliveryId) {
         try {
-          // Verifica se o Pusher ainda está conectado
-          if (!pusherService.isConnected) {
-            console.warn('Pusher desconectado, pulando envio de localização');
-            return;
-          }
-
-          await this.sendLocationToPusher(this.currentLocation);
+          // pois estamos usando API direta
+          await this.sendLocationToApi(this.currentLocation);
         } catch (error) {
           console.error('Erro ao enviar localização:', error);
         }
@@ -143,21 +120,29 @@ class LocationService {
     }, 10000); // 10 segundos
   }
 
-  // Envia localização via Pusher
-  private async sendLocationToPusher(location: LocationData): Promise<void> {
+  // Envia localização via API
+  private async sendLocationToApi(location: LocationData): Promise<void> {
     if (!this.deliveryId) {
       console.warn('DeliveryId não configurado');
       return;
     }
 
+    // const locationPayload = {
+    //   deliveryId: this.deliveryId,
+    //   location: location,
+    //   status: 'em_rota',
+    // };
     const locationPayload = {
-      deliveryId: this.deliveryId,
-      location: location,
-      status: 'em_rota',
+      channel:'private-delivery-realtime',
+      event:'update_localization',
+      data:[location]
     };
 
+    
+
     try {
-      await pusherService.sendDeliveryLocation(locationPayload);
+      // Enviar localização para o backend via API
+      await apiService.sendDeliveryLocation(locationPayload as any);
       console.log('✅ Localização enviada:', {
         lat: location.latitude.toFixed(6),
         lng: location.longitude.toFixed(6),
@@ -165,7 +150,7 @@ class LocationService {
       });
       
     } catch (error) {
-      console.error('❌ Erro ao enviar localização via Pusher:', error);
+      console.error('❌ Erro ao enviar localização via API:', error);
     }
   }
 
